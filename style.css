@@ -1905,13 +1905,20 @@ input[type="range"].slider::-webkit-slider-thumb:hover {
 .gdrive-status-container {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   font-size: 0.85rem;
   font-weight: 500;
-  padding: 8px 12px;
+  padding: 10px 14px;
   background-color: var(--color-surface-2);
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
+}
+
+.gdrive-status-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .gdrive-status-container .status-label {
@@ -1921,6 +1928,106 @@ input[type="range"].slider::-webkit-slider-thumb:hover {
 .gdrive-status-container .status-value {
   color: var(--color-text-primary);
   font-weight: 600;
+}
+
+.gdrive-sync-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background-color: var(--color-surface-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  padding: 12px 14px;
+}
+
+.gdrive-sync-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.gdrive-sync-label {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.gdrive-sync-select {
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  outline: none;
+  cursor: pointer;
+  transition: border-color var(--duration-fast);
+}
+
+.gdrive-sync-select:focus {
+  border-color: var(--color-primary);
+}
+
+.gdrive-client-id-toggle {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  text-align: left;
+  transition: color var(--duration-fast);
+}
+
+.gdrive-client-id-toggle:hover {
+  color: var(--color-primary);
+}
+
+.gdrive-client-id-panel {
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--color-border);
+}
+
+.gdrive-client-id-panel.active {
+  display: flex;
+}
+
+.gdrive-client-id-input-wrap {
+  display: flex;
+  gap: 8px;
+}
+
+.gdrive-client-id-input {
+  flex: 1;
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  font-family: monospace;
+}
+
+.gdrive-client-id-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.sync-icon-spin {
+  animation: gdrive-spin 1s linear infinite;
+}
+
+@keyframes gdrive-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .settings-actions {

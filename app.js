@@ -1,9 +1,24 @@
 // State and Constants
-const GOOGLE_CLIENT_ID = '461450879911-5c3efm2cm8hkk04dgihamf8osds5k9mn.apps.googleusercontent.com';
+const DEFAULT_GOOGLE_CLIENT_ID = '461450879911-5c3efm2cm8hkk04dgihamf8osds5k9mn.apps.googleusercontent.com';
 let googleTokenClient = null;
 let googleAccessToken = null;
-let googleUserEmail = '';
+let googleUserEmail = localStorage.getItem('moyeniz_gdrive_email') || '';
+let googleTokenExpiresAt = 0;
 let pendingGDriveAction = null;
+let autoSyncIntervalId = null;
+let autoSyncDebounceTimer = null;
+let isSyncingToGDrive = false;
+let lastSyncedTimestamp = parseInt(localStorage.getItem('moyeniz_last_synced_at') || '0', 10);
+let autoSyncMinutes = parseInt(localStorage.getItem('moyeniz_auto_sync_interval') !== null ? localStorage.getItem('moyeniz_auto_sync_interval') : '15', 10);
+let relativeTimeIntervalId = null;
+
+function getGoogleClientId() {
+  const custom = localStorage.getItem('moyeniz_custom_client_id');
+  if (custom && custom.trim().length > 0) {
+    return custom.trim();
+  }
+  return DEFAULT_GOOGLE_CLIENT_ID;
+}
 
 let investments = [];
 let liabilities = [];
@@ -547,6 +562,8 @@ function saveToStorage() {
   localStorage.setItem('moyeniz_global_budget', globalBudget.toString());
   localStorage.setItem('moyeniz_monthly_budgets', JSON.stringify(monthlyBudgets));
   localStorage.setItem('moyeniz_asset_categories', JSON.stringify(ASSET_CATEGORIES));
+  
+  scheduleDebouncedAutoSync();
 }
 
 function adjustDefaultSavingsBalance(amount) {
@@ -8302,6 +8319,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   initCalculatorSliders();
   initGoogleDriveSync();
 
+  // Periodically update relative time for last synced display
+  if (!relativeTimeIntervalId) {
+    relativeTimeIntervalId = setInterval(updateLastSyncedDisplay, 30000);
+  }
+
   // Render active view
   const activeTabLink = document.querySelector('.nav-link.active');
   const activeTabName = activeTabLink ? activeTabLink.getAttribute('data-tab') : 'dashboard';
@@ -8317,7 +8339,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 
-// Google Drive Sync Helper Functions
+// Google Drive Sync & Periodic Auto-Sync Engine
 let gdriveRestoreConfirmTimeout = null;
 
 // Helper to mask PII email addresses
@@ -8330,6 +8352,28 @@ function maskEmail(email) {
   return `${local[0]}${local[1]}***${local[local.length - 1]}@${domain}`;
 }
 
+// Relative time formatter
+function formatRelativeTime(timestamp) {
+  if (!timestamp || timestamp === 0) return 'Never';
+  const diffSec = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  if (diffSec < 30) return 'Just now';
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
+}
+
+// Update Last Synced element
+function updateLastSyncedDisplay() {
+  const lastSyncEl = document.getElementById('page-gdrive-last-sync');
+  if (lastSyncEl) {
+    lastSyncEl.textContent = formatRelativeTime(lastSyncedTimestamp);
+  }
+}
+
 // Update UI status safely
 function updateGDriveStatus(message, isError = false) {
   const statusEl = document.getElementById('page-gdrive-status');
@@ -8338,7 +8382,32 @@ function updateGDriveStatus(message, isError = false) {
     if (isError) {
       statusEl.style.color = 'var(--color-negative)';
     } else {
-      statusEl.style.color = 'var(--color-text-secondary)';
+      statusEl.style.color = 'var(--color-text-primary)';
+    }
+  }
+}
+
+// Update Top / Status indicator
+function updateSyncIndicator(text, isError = false, isSpinning = false) {
+  const indEl = document.getElementById('page-gdrive-sync-indicator');
+  const syncIcon = document.getElementById('icon-sync-now');
+
+  if (indEl) {
+    indEl.textContent = text;
+    if (isError) {
+      indEl.style.color = 'var(--color-negative)';
+    } else if (isSpinning) {
+      indEl.style.color = 'var(--color-primary)';
+    } else {
+      indEl.style.color = 'var(--color-text-muted)';
+    }
+  }
+
+  if (syncIcon) {
+    if (isSpinning) {
+      syncIcon.classList.add('sync-icon-spin');
+    } else {
+      syncIcon.classList.remove('sync-icon-spin');
     }
   }
 }
@@ -8346,18 +8415,364 @@ function updateGDriveStatus(message, isError = false) {
 // Update standard connected state
 function updateSyncStatusUI() {
   const btnConnect = document.getElementById('btn-page-gdrive-connect');
-  if (googleAccessToken && googleUserEmail) {
+  const btnSyncNow = document.getElementById('btn-page-gdrive-sync-now');
+  const isConnected = (googleAccessToken || localStorage.getItem('moyeniz_gdrive_connected') === 'true') && googleUserEmail;
+
+  if (isConnected) {
     updateGDriveStatus(`Connected (${maskEmail(googleUserEmail)})`);
     if (btnConnect) btnConnect.textContent = 'Disconnect Google Account';
+    if (btnSyncNow) btnSyncNow.style.display = 'inline-flex';
   } else {
     updateGDriveStatus('Not Connected');
     if (btnConnect) btnConnect.textContent = 'Connect Google Account';
+    if (btnSyncNow) btnSyncNow.style.display = 'none';
+  }
+
+  updateLastSyncedDisplay();
+}
+
+// Start periodic background auto-sync timer
+function startAutoSyncTimer() {
+  if (autoSyncIntervalId) {
+    clearInterval(autoSyncIntervalId);
+    autoSyncIntervalId = null;
+  }
+
+  if (autoSyncMinutes > 0 && localStorage.getItem('moyeniz_gdrive_connected') === 'true') {
+    const intervalMs = autoSyncMinutes * 60 * 1000;
+    autoSyncIntervalId = setInterval(async () => {
+      if (!isSyncingToGDrive && localStorage.getItem('moyeniz_gdrive_connected') === 'true') {
+        if (!googleAccessToken || Date.now() > googleTokenExpiresAt - 60000) {
+          // Token expired or missing, request silently
+          if (googleTokenClient) {
+            pendingGDriveAction = 'sync';
+            try {
+              googleTokenClient.requestAccessToken({ prompt: 'none' });
+            } catch (e) {
+              console.warn('Auto-sync silent token request failed:', e);
+            }
+          }
+        } else {
+          await performGDriveSync(true);
+        }
+      }
+    }, intervalMs);
+  }
+}
+
+// Schedule debounced auto-sync after user edits
+function scheduleDebouncedAutoSync() {
+  if (autoSyncMinutes > 0 && localStorage.getItem('moyeniz_gdrive_connected') === 'true') {
+    if (autoSyncDebounceTimer) clearTimeout(autoSyncDebounceTimer);
+    autoSyncDebounceTimer = setTimeout(async () => {
+      if (googleAccessToken && !isSyncingToGDrive) {
+        await performGDriveSync(true);
+      }
+    }, 4000);
+  }
+}
+
+// Initializer for Google Identity Services client
+function initGoogleDriveSync() {
+  const clientId = getGoogleClientId();
+
+  if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+    try {
+      googleTokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: 'email https://www.googleapis.com/auth/drive.appdata',
+        callback: async (tokenResponse) => {
+          if (tokenResponse.error !== undefined) {
+            console.error('OAuth token client error:', tokenResponse.error);
+            updateGDriveStatus('Error: Auth failed', true);
+            isSyncingToGDrive = false;
+            updateSyncIndicator('Auth failed', true);
+            return;
+          }
+
+          googleAccessToken = tokenResponse.access_token;
+          googleTokenExpiresAt = Date.now() + (parseInt(tokenResponse.expires_in, 10) || 3600) * 1000;
+          localStorage.setItem('moyeniz_gdrive_connected', 'true');
+
+          await fetchGoogleUserEmail();
+          startAutoSyncTimer();
+
+          if (pendingGDriveAction) {
+            const action = pendingGDriveAction;
+            pendingGDriveAction = null;
+            if (action === 'backup') {
+              await performGDriveBackup();
+            } else if (action === 'restore') {
+              await performGDriveRestore();
+            } else if (action === 'sync') {
+              await performGDriveSync();
+            }
+          }
+        }
+      });
+
+      // Auto-reconnect silently if previously connected
+      if (localStorage.getItem('moyeniz_gdrive_connected') === 'true') {
+        startAutoSyncTimer();
+        if (!googleAccessToken) {
+          try {
+            googleTokenClient.requestAccessToken({ prompt: 'none' });
+          } catch (e) {
+            console.log('Silent re-auth skipped or not supported:', e);
+          }
+        }
+      }
+
+      updateSyncStatusUI();
+    } catch (err) {
+      console.error('Failed to initialize Google token client:', err);
+      updateGDriveStatus('Init Error', true);
+    }
+  } else {
+    // Retry if script is still downloading
+    setTimeout(() => {
+      if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+        initGoogleDriveSync();
+      } else {
+        updateGDriveStatus('Google API Blocked');
+      }
+    }, 800);
+  }
+}
+
+// Fetch Google User Email to display in settings status
+async function fetchGoogleUserEmail() {
+  try {
+    const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { 'Authorization': `Bearer ${googleAccessToken}` }
+    });
+    if (response.ok) {
+      const data = await response.json();
+      googleUserEmail = data.email || '';
+      localStorage.setItem('moyeniz_gdrive_email', googleUserEmail);
+      updateSyncStatusUI();
+    }
+  } catch (err) {
+    console.error('Error fetching user email:', err);
+  }
+}
+
+// Perform Intelligent Sync (Auto / Manual)
+async function performGDriveSync(isBackground = false) {
+  if (isSyncingToGDrive) return;
+  isSyncingToGDrive = true;
+  updateSyncIndicator('Syncing...', false, true);
+  if (!isBackground) updateGDriveStatus('Sync: In Progress...');
+
+  try {
+    await performGDriveBackup(true);
+
+    lastSyncedTimestamp = Date.now();
+    localStorage.setItem('moyeniz_last_synced_at', lastSyncedTimestamp.toString());
+    updateLastSyncedDisplay();
+    updateSyncIndicator('Up to date', false);
+
+    if (!isBackground) {
+      updateGDriveStatus('Sync Successful!');
+      setTimeout(() => updateSyncStatusUI(), 3000);
+    }
+  } catch (err) {
+    console.error('Sync failed:', err);
+    updateSyncIndicator('Sync failed', true);
+    if (!isBackground) {
+      updateGDriveStatus('Sync Failed', true);
+      setTimeout(() => updateSyncStatusUI(), 3000);
+    }
+  } finally {
+    isSyncingToGDrive = false;
+    updateSyncIndicator('Idle', false, false);
+  }
+}
+
+// Perform Google Drive Backup (Upload)
+async function performGDriveBackup(silent = false) {
+  if (!silent) updateGDriveStatus('Sync: Backing up...');
+  try {
+    // 1. Search for existing file in appDataFolder
+    const searchUrl = 'https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name=%27moyeniz_backup.json%27';
+    const searchResponse = await fetch(searchUrl, {
+      headers: { 'Authorization': `Bearer ${googleAccessToken}` }
+    });
+
+    if (searchResponse.status === 401) {
+      pendingGDriveAction = 'backup';
+      if (googleTokenClient) googleTokenClient.requestAccessToken();
+      return;
+    }
+
+    if (!searchResponse.ok) {
+      throw new Error(`Search failed: ${searchResponse.status}`);
+    }
+
+    const searchData = await searchResponse.json();
+    const fileId = searchData.files && searchData.files.length > 0 ? searchData.files[0].id : null;
+
+    // 2. Prepare payload
+    const payload = {
+      investments,
+      liabilities,
+      borrowLent,
+      salaries,
+      expenses,
+      expenseCategories,
+      globalBudget,
+      monthlyBudgets,
+      backupDate: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+
+    if (fileId) {
+      // Overwrite existing file (PATCH)
+      const updateUrl = `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`;
+      const updateResponse = await fetch(updateUrl, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${googleAccessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!updateResponse.ok) {
+        throw new Error(`Update failed: ${updateResponse.status}`);
+      }
+    } else {
+      // Create new file (POST multipart)
+      const metadata = {
+        name: 'moyeniz_backup.json',
+        parents: ['appDataFolder']
+      };
+
+      const form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+      form.append('file', blob);
+
+      const createResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${googleAccessToken}` },
+        body: form
+      });
+
+      if (!createResponse.ok) {
+        throw new Error(`Creation failed: ${createResponse.status}`);
+      }
+    }
+
+    lastSyncedTimestamp = Date.now();
+    localStorage.setItem('moyeniz_last_synced_at', lastSyncedTimestamp.toString());
+    updateLastSyncedDisplay();
+
+    if (!silent) {
+      updateGDriveStatus('Backup Successful!');
+      setTimeout(() => updateSyncStatusUI(), 3000);
+    }
+  } catch (err) {
+    console.error('Backup error:', err);
+    if (!silent) {
+      updateGDriveStatus('Backup Failed', true);
+      setTimeout(() => updateSyncStatusUI(), 3000);
+    }
+    throw err;
+  }
+}
+
+// Perform Google Drive Restore (Download)
+async function performGDriveRestore() {
+  updateGDriveStatus('Sync: Restoring...');
+  try {
+    // 1. Search for file in appDataFolder
+    const searchUrl = 'https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name=%27moyeniz_backup.json%27';
+    const searchResponse = await fetch(searchUrl, {
+      headers: { 'Authorization': `Bearer ${googleAccessToken}` }
+    });
+
+    if (searchResponse.status === 401) {
+      pendingGDriveAction = 'restore';
+      if (googleTokenClient) googleTokenClient.requestAccessToken();
+      return;
+    }
+
+    if (!searchResponse.ok) {
+      throw new Error(`Search failed: ${searchResponse.status}`);
+    }
+
+    const searchData = await searchResponse.json();
+    const fileId = searchData.files && searchData.files.length > 0 ? searchData.files[0].id : null;
+
+    if (!fileId) {
+      updateGDriveStatus('No backup found on Drive!', true);
+      setTimeout(() => updateSyncStatusUI(), 4000);
+      return;
+    }
+
+    // 2. Fetch file content
+    const restoreUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+    const restoreResponse = await fetch(restoreUrl, {
+      headers: { 'Authorization': `Bearer ${googleAccessToken}` }
+    });
+
+    if (!restoreResponse.ok) {
+      throw new Error(`Fetch failed: ${restoreResponse.status}`);
+    }
+
+    const data = await restoreResponse.json();
+    validateBackupSchema(data);
+
+    // 3. Load & render data
+    investments = data.investments;
+    liabilities = data.liabilities || [];
+    borrowLent = data.borrowLent || [];
+    salaries = data.salaries || [];
+    expenses = data.expenses || [];
+    expenseCategories = data.expenseCategories || [...DEFAULT_EXPENSE_CATEGORIES];
+    globalBudget = typeof data.globalBudget === 'number' ? data.globalBudget : 40000;
+    monthlyBudgets = data.monthlyBudgets && typeof data.monthlyBudgets === 'object' ? data.monthlyBudgets : {};
+
+    saveToStorage();
+
+    lastSyncedTimestamp = Date.now();
+    localStorage.setItem('moyeniz_last_synced_at', lastSyncedTimestamp.toString());
+    updateLastSyncedDisplay();
+
+    // Render currently active tab
+    const activeTabLink = document.querySelector('.nav-link.active');
+    const activeTabName = activeTabLink ? activeTabLink.getAttribute('data-tab') : 'dashboard';
+    if (activeTabName === 'dashboard') renderDashboard();
+    else if (activeTabName === 'investments') renderInvestments();
+    else if (activeTabName === 'liabilities') renderLiabilities();
+    else if (activeTabName === 'borrow-lent') renderBorrowLent();
+    else if (activeTabName === 'salary') renderSalaries();
+    else if (activeTabName === 'expenses') renderExpenses();
+
+    updateGDriveStatus('Restore Successful!');
+    setTimeout(() => updateSyncStatusUI(), 3000);
+  } catch (err) {
+    console.error('Restore error:', err);
+    updateGDriveStatus('Restore Failed', true);
+    setTimeout(() => updateSyncStatusUI(), 3000);
   }
 }
 
 // Settings Page Render
 function renderSettings() {
   updateSyncStatusUI();
+
+  // Populate Auto-sync selector
+  const selectAutoSync = document.getElementById('select-gdrive-auto-sync');
+  if (selectAutoSync) {
+    selectAutoSync.value = autoSyncMinutes.toString();
+  }
+
+  // Populate custom client id
+  const inputClientId = document.getElementById('input-custom-client-id');
+  if (inputClientId) {
+    inputClientId.value = localStorage.getItem('moyeniz_custom_client_id') || '';
+  }
 }
 
 async function handleGDriveBackupClick() {
@@ -8405,6 +8820,19 @@ async function handleGDriveRestoreClick(noConfirm = false) {
   }
 }
 
+async function handleGDriveSyncClick() {
+  if (!googleTokenClient) {
+    alert('Google Drive API is blocked or not loaded. Check your connection or Content Security Policy.');
+    return;
+  }
+  if (!googleAccessToken) {
+    pendingGDriveAction = 'sync';
+    googleTokenClient.requestAccessToken();
+  } else {
+    await performGDriveSync(false);
+  }
+}
+
 // Initialize settings page and sync dropdown handlers
 function initSettingsHandlers() {
   // Sync portfolio popup modal toggle
@@ -8442,7 +8870,7 @@ function initSettingsHandlers() {
     if (btnPopupSyncGDrive) {
       btnPopupSyncGDrive.addEventListener('click', async () => {
         syncModal.classList.remove('active-modal');
-        await handleGDriveBackupClick();
+        await handleGDriveSyncClick();
       });
     }
   }
@@ -8457,22 +8885,42 @@ function initSettingsHandlers() {
 
   // Dedicated settings page buttons
   const btnConnect = document.getElementById('btn-page-gdrive-connect');
+  const btnSyncNow = document.getElementById('btn-page-gdrive-sync-now');
   const btnBackup = document.getElementById('btn-page-gdrive-backup');
   const btnRestore = document.getElementById('btn-page-gdrive-restore');
 
   if (btnConnect) {
     btnConnect.addEventListener('click', () => {
-      if (googleAccessToken) {
+      if (googleAccessToken || localStorage.getItem('moyeniz_gdrive_connected') === 'true') {
+        // Disconnect
         googleAccessToken = null;
         googleUserEmail = '';
+        localStorage.removeItem('moyeniz_gdrive_connected');
+        localStorage.removeItem('moyeniz_gdrive_email');
+        if (autoSyncIntervalId) {
+          clearInterval(autoSyncIntervalId);
+          autoSyncIntervalId = null;
+        }
         updateSyncStatusUI();
       } else {
+        // Connect
         if (googleTokenClient) {
-          googleTokenClient.requestAccessToken();
+          googleTokenClient.requestAccessToken({ prompt: 'select_account' });
         } else {
-          alert('Google Drive API is blocked or not loaded. Check your connection or Content Security Policy.');
+          initGoogleDriveSync();
+          if (googleTokenClient) {
+            googleTokenClient.requestAccessToken({ prompt: 'select_account' });
+          } else {
+            alert('Google Drive API is blocked or not loaded. Check your connection or Content Security Policy.');
+          }
         }
       }
+    });
+  }
+
+  if (btnSyncNow) {
+    btnSyncNow.addEventListener('click', async () => {
+      await handleGDriveSyncClick();
     });
   }
 
@@ -8485,6 +8933,42 @@ function initSettingsHandlers() {
   if (btnRestore) {
     btnRestore.addEventListener('click', async () => {
       await handleGDriveRestoreClick();
+    });
+  }
+
+  // Auto-sync interval selector
+  const selectAutoSync = document.getElementById('select-gdrive-auto-sync');
+  if (selectAutoSync) {
+    selectAutoSync.addEventListener('change', (e) => {
+      autoSyncMinutes = parseInt(e.target.value, 10);
+      localStorage.setItem('moyeniz_auto_sync_interval', autoSyncMinutes.toString());
+      startAutoSyncTimer();
+    });
+  }
+
+  // Custom Client ID toggle & save
+  const btnToggleClientId = document.getElementById('btn-toggle-client-id');
+  const panelClientId = document.getElementById('panel-client-id');
+  if (btnToggleClientId && panelClientId) {
+    btnToggleClientId.addEventListener('click', () => {
+      const isExpanded = panelClientId.classList.toggle('active');
+      btnToggleClientId.setAttribute('aria-expanded', isExpanded.toString());
+    });
+  }
+
+  const btnSaveClientId = document.getElementById('btn-save-custom-client-id');
+  const inputClientId = document.getElementById('input-custom-client-id');
+  if (btnSaveClientId && inputClientId) {
+    btnSaveClientId.addEventListener('click', () => {
+      const val = inputClientId.value.trim();
+      if (val) {
+        localStorage.setItem('moyeniz_custom_client_id', val);
+        alert('Custom Google OAuth Client ID saved! Reinitializing connection...');
+      } else {
+        localStorage.removeItem('moyeniz_custom_client_id');
+        alert('Custom Google Client ID cleared. Reverting to default.');
+      }
+      initGoogleDriveSync();
     });
   }
 
@@ -8539,6 +9023,7 @@ function initSettingsHandlers() {
         localStorage.removeItem('moyeniz_expense_categories');
         localStorage.removeItem('moyeniz_global_budget');
         localStorage.removeItem('moyeniz_monthly_budgets');
+        localStorage.removeItem('moyeniz_last_synced_at');
         investments = [];
         liabilities = [];
         borrowLent = [];
@@ -8547,6 +9032,7 @@ function initSettingsHandlers() {
         expenseCategories = [];
         globalBudget = 40000;
         monthlyBudgets = {};
+        lastSyncedTimestamp = 0;
 
         renderSettings();
 
@@ -8568,212 +9054,5 @@ function initSettingsHandlers() {
         alert('Cached browser data cleared successfully.');
       }
     });
-  }
-}
-
-// Initializer for Google Identity Services client
-function initGoogleDriveSync() {
-  // Load GIS token client
-  if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
-    googleTokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: GOOGLE_CLIENT_ID,
-      scope: 'email https://www.googleapis.com/auth/drive.appdata',
-      callback: async (tokenResponse) => {
-        if (tokenResponse.error !== undefined) {
-          console.error('OAuth token client error:', tokenResponse.error);
-          updateGDriveStatus('Error: Auth failed', true);
-          return;
-        }
-        googleAccessToken = tokenResponse.access_token;
-        await fetchGoogleUserEmail();
-
-        if (pendingGDriveAction) {
-          const action = pendingGDriveAction;
-          pendingGDriveAction = null;
-          if (action === 'backup') {
-            await performGDriveBackup();
-          } else if (action === 'restore') {
-            await performGDriveRestore();
-          }
-        }
-      }
-    });
-  } else {
-    // If the library script is not loaded or blocked
-    updateGDriveStatus('Google API Blocked');
-  }
-}
-
-// Fetch Google User Email to display in settings status
-async function fetchGoogleUserEmail() {
-  try {
-    const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { 'Authorization': `Bearer ${googleAccessToken}` }
-    });
-    if (response.ok) {
-      const data = await response.json();
-      googleUserEmail = data.email || '';
-      updateSyncStatusUI();
-    }
-  } catch (err) {
-    console.error('Error fetching user email:', err);
-  }
-}
-
-// Perform Google Drive Backup (Upload)
-async function performGDriveBackup() {
-  updateGDriveStatus('Sync: Backing up...');
-  try {
-    // 1. Search for existing file in appDataFolder
-    const searchUrl = 'https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name=%27moyeniz_backup.json%27';
-    const searchResponse = await fetch(searchUrl, {
-      headers: { 'Authorization': `Bearer ${googleAccessToken}` }
-    });
-
-    if (searchResponse.status === 401) {
-      // Re-authenticate
-      pendingGDriveAction = 'backup';
-      googleTokenClient.requestAccessToken();
-      return;
-    }
-
-    if (!searchResponse.ok) {
-      throw new Error(`Search failed: ${searchResponse.status}`);
-    }
-
-    const searchData = await searchResponse.json();
-    const fileId = searchData.files && searchData.files.length > 0 ? searchData.files[0].id : null;
-
-    // 2. Prepare payload
-    const payload = {
-      investments,
-      liabilities,
-      borrowLent,
-      salaries,
-      expenses,
-      expenseCategories,
-      globalBudget,
-      monthlyBudgets,
-      backupDate: new Date().toISOString()
-    };
-    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-
-    if (fileId) {
-      // File exists - overwrite it (PATCH)
-      const updateUrl = `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`;
-      const updateResponse = await fetch(updateUrl, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${googleAccessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!updateResponse.ok) {
-        throw new Error(`Update failed: ${updateResponse.status}`);
-      }
-    } else {
-      // File doesn't exist - create new (POST multipart)
-      const metadata = {
-        name: 'moyeniz_backup.json',
-        parents: ['appDataFolder']
-      };
-
-      const form = new FormData();
-      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-      form.append('file', blob);
-
-      const createResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${googleAccessToken}` },
-        body: form
-      });
-
-      if (!createResponse.ok) {
-        throw new Error(`Creation failed: ${createResponse.status}`);
-      }
-    }
-
-    updateGDriveStatus('Backup Successful!');
-    setTimeout(() => updateSyncStatusUI(), 3000);
-  } catch (err) {
-    console.error('Backup error:', err);
-    updateGDriveStatus('Backup Failed', true);
-    setTimeout(() => updateSyncStatusUI(), 3000);
-  }
-}
-
-// Perform Google Drive Restore (Download)
-async function performGDriveRestore() {
-  updateGDriveStatus('Sync: Restoring...');
-  try {
-    // 1. Search for file in appDataFolder
-    const searchUrl = 'https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name=%27moyeniz_backup.json%27';
-    const searchResponse = await fetch(searchUrl, {
-      headers: { 'Authorization': `Bearer ${googleAccessToken}` }
-    });
-
-    if (searchResponse.status === 401) {
-      // Re-authenticate
-      pendingGDriveAction = 'restore';
-      googleTokenClient.requestAccessToken();
-      return;
-    }
-
-    if (!searchResponse.ok) {
-      throw new Error(`Search failed: ${searchResponse.status}`);
-    }
-
-    const searchData = await searchResponse.json();
-    const fileId = searchData.files && searchData.files.length > 0 ? searchData.files[0].id : null;
-
-    if (!fileId) {
-      updateGDriveStatus('No backup found on Drive!', true);
-      setTimeout(() => updateSyncStatusUI(), 4000);
-      return;
-    }
-
-    // 2. Fetch file content
-    const restoreUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
-    const restoreResponse = await fetch(restoreUrl, {
-      headers: { 'Authorization': `Bearer ${googleAccessToken}` }
-    });
-
-    if (!restoreResponse.ok) {
-      throw new Error(`Fetch failed: ${restoreResponse.status}`);
-    }
-
-    const data = await restoreResponse.json();
-    validateBackupSchema(data);
-
-    // 3. Load & render data
-    investments = data.investments;
-    liabilities = data.liabilities || [];
-    borrowLent = data.borrowLent || [];
-    salaries = data.salaries || [];
-    expenses = data.expenses || [];
-    expenseCategories = data.expenseCategories || [...DEFAULT_EXPENSE_CATEGORIES];
-    globalBudget = typeof data.globalBudget === 'number' ? data.globalBudget : 40000;
-    monthlyBudgets = data.monthlyBudgets && typeof data.monthlyBudgets === 'object' ? data.monthlyBudgets : {};
-
-    saveToStorage();
-
-    // Render currently active tab
-    const activeTabLink = document.querySelector('.nav-link.active');
-    const activeTabName = activeTabLink ? activeTabLink.getAttribute('data-tab') : 'dashboard';
-    if (activeTabName === 'dashboard') renderDashboard();
-    else if (activeTabName === 'investments') renderInvestments();
-    else if (activeTabName === 'liabilities') renderLiabilities();
-    else if (activeTabName === 'borrow-lent') renderBorrowLent();
-    else if (activeTabName === 'salary') renderSalaries();
-    else if (activeTabName === 'expenses') renderExpenses();
-
-    updateGDriveStatus('Restore Successful!');
-    setTimeout(() => updateSyncStatusUI(), 3000);
-  } catch (err) {
-    console.error('Restore error:', err);
-    updateGDriveStatus('Restore Failed', true);
-    setTimeout(() => updateSyncStatusUI(), 3000);
   }
 }

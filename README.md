@@ -50,23 +50,55 @@ Your financial data is personal, and Moyeniz respects that. The app is built on 
 
 ---
 
+## ☁️ Deploy to Vercel
+
+Moyeniz is 100% static and zero-dependency, ready for 1-click deployment on [Vercel](https://vercel.com).
+
+### Option A: Import via Vercel Dashboard (Recommended)
+1. Push your repository to GitHub / GitLab / Bitbucket.
+2. Go to [vercel.com/new](https://vercel.com/new) and import your repository.
+3. Keep default settings (Framework Preset: **Other**) and click **Deploy**.
+
+### Option B: Deploy using Vercel CLI
+1. Install Vercel CLI:
+   ```bash
+   npm i -g vercel
+   ```
+2. Run in the root directory:
+   ```bash
+   vercel
+   ```
+
+---
+
+## 🔄 Google Account & Automatic Periodic Sync
+
+Moyeniz supports seamless cloud synchronization using Google Drive's hidden **App Data Folder** (`drive.appdata` scope).
+
+* **100% Private**: Syncs directly between your browser and your private Google Drive account. No intermediate database or third-party server.
+* **Periodic Auto-Sync**: Automatically synchronizes data every 5, 15, 30, or 60 minutes, or debounced on every change.
+* **Custom Google OAuth Client ID**: If hosting on a custom Vercel domain (`your-app.vercel.app`), simply create an OAuth 2.0 Web Client ID in [Google Cloud Console](https://console.cloud.google.com/apis/credentials) with your Vercel URL added under **Authorized JavaScript origins**, and enter your Client ID under **Settings > Custom Google OAuth Client ID**.
+
+---
+
 ## 🛠️ How to Run Locally
 
 Since Moyeniz contains no external compilation dependencies, you can launch it using any lightweight static web server.
 
-### Using Python (Quickest)
-1. Navigate to the project root directory in your terminal.
-2. Run:
-   ```bash
-   python3 -m http.server 8000 --bind 127.0.0.1
-   ```
-3. Open `http://127.0.0.1:8000/` in your web browser.
-
 ### Using Node.js (npx)
-1. Run:
-   ```bash
-   npx http-server -p 8000 -a 127.0.0.1
-   ```
-2. Open `http://127.0.0.1:8000/` in your web browser.
+```bash
+npx serve .
+```
+or
+```bash
+npx http-server -p 8000 -a 127.0.0.1
+```
+
+### Using Python (Quickest)
+```bash
+python -m http.server 8000 --bind 127.0.0.1
+```
+Open `http://127.0.0.1:8000/` in your browser.
 
 ---
+
