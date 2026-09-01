@@ -1502,22 +1502,72 @@
               </div>
               <div>
                 <h3 class="settings-card-title">Google Drive Sync</h3>
-                <p class="settings-card-subtitle">Connect your personal Google Account to sync data across devices.</p>
+                <p class="settings-card-subtitle">Connect your personal Google Account to automatically sync data across devices.</p>
               </div>
             </div>
             <div class="settings-card-body">
               <div class="gdrive-info-box">
                 <p><strong>🔒 Privacy-First Design:</strong> Moyeniz uses a hidden <strong>App Data Folder</strong> on
                   your personal Google Drive. This folder is completely private, isolated from other websites/apps, and
-                  cannot be accessed or read by the Moyeniz developers. Your data is 100% yours.</p>
+                  cannot be accessed or read by third parties. Your financial data stays 100% yours.</p>
               </div>
               <div class="gdrive-status-container">
-                <span class="status-label">Status:</span>
-                <span id="page-gdrive-status" class="status-value">Not Connected</span>
+                <div class="gdrive-status-left">
+                  <span class="status-label">Account:</span>
+                  <span id="page-gdrive-status" class="status-value">Not Connected</span>
+                </div>
+                <div id="page-gdrive-sync-indicator" style="font-size: 0.78rem; color: var(--color-text-muted);">
+                  Idle
+                </div>
               </div>
+
+              <!-- Auto-Sync & Interval Settings -->
+              <div class="gdrive-sync-options">
+                <div class="gdrive-sync-row">
+                  <span class="gdrive-sync-label">Auto-Sync Interval:</span>
+                  <select id="select-gdrive-auto-sync" class="gdrive-sync-select" aria-label="Auto-Sync Interval">
+                    <option value="0">Disabled (Manual Only)</option>
+                    <option value="5">Every 5 minutes</option>
+                    <option value="15" selected>Every 15 minutes</option>
+                    <option value="30">Every 30 minutes</option>
+                    <option value="60">Every 1 hour</option>
+                  </select>
+                </div>
+                <div class="gdrive-sync-row">
+                  <span class="gdrive-sync-label">Last Synced:</span>
+                  <span id="page-gdrive-last-sync" style="font-size: 0.82rem; font-weight: 600; color: var(--color-text-primary);">Never</span>
+                </div>
+
+                <!-- Collapsible Custom Client ID Config -->
+                <button type="button" class="gdrive-client-id-toggle" id="btn-toggle-client-id" aria-expanded="false">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                  </svg>
+                  Custom Google OAuth Client ID (Optional)
+                </button>
+                <div class="gdrive-client-id-panel" id="panel-client-id">
+                  <p style="font-size: 0.74rem; color: var(--color-text-secondary); line-height: 1.4; margin: 0;">
+                    Hosting on your own Vercel domain (e.g. <code>yourapp.vercel.app</code>)? Create a Google OAuth 2.0 Client ID in Google Cloud Console and paste it here:
+                  </p>
+                  <div class="gdrive-client-id-input-wrap">
+                    <input type="text" id="input-custom-client-id" class="gdrive-client-id-input" placeholder="e.g. 123456-abc.apps.googleusercontent.com" spellcheck="false" autocomplete="off" />
+                    <button type="button" class="btn btn-secondary" id="btn-save-custom-client-id" style="padding: 6px 12px; font-size: 0.78rem;">Save</button>
+                  </div>
+                </div>
+              </div>
+
               <div class="settings-actions">
                 <button class="btn btn-secondary" id="btn-page-gdrive-connect">
                   Connect Google Account
+                </button>
+                <button class="btn btn-secondary" id="btn-page-gdrive-sync-now" style="display: none;">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"
+                    id="icon-sync-now" style="margin-right: 6px;">
+                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                  </svg>
+                  Sync Now
                 </button>
                 <button class="btn btn-secondary" id="btn-page-gdrive-backup">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
