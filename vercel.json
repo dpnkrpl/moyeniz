@@ -22,8 +22,12 @@
           "value": "strict-origin-when-cross-origin"
         },
         {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin-allow-popups"
+        },
+        {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; script-src 'self' https://accounts.google.com/gsi/client 'unsafe-eval'; connect-src 'self' https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com;"
+          "value": "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; script-src 'self' https://accounts.google.com/gsi/client https://apis.google.com 'unsafe-inline' 'unsafe-eval'; frame-src 'self' https://accounts.google.com https://content.googleapis.com; child-src 'self' https://accounts.google.com https://content.googleapis.com; connect-src 'self' https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com;"
         }
       ]
     },

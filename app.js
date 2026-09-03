@@ -8529,9 +8529,9 @@ function initGoogleDriveSync() {
           console.error('Google Identity Service error_callback:', err);
           let msg = 'Google Sign-In failed.';
           if (err && err.type === 'popup_failed_to_open') {
-            msg = 'Popup blocked by browser. Please allow popups for this site.';
+            msg = 'Google Sign-In popup could not open.\n\nTroubleshooting steps:\n1. Check if an ad blocker or privacy extension is blocking accounts.google.com.\n2. Ensure your Vercel URL is added under "Authorized JavaScript origins" in Google Cloud Console.\n3. Make sure third-party cookies or popups are not blocked for Google.';
           } else if (err && err.type === 'popup_closed') {
-            msg = 'Popup closed.';
+            msg = 'Sign-in popup was closed before completing.';
           }
           updateSyncIndicator(msg, true, false);
           alert(msg);
@@ -8792,7 +8792,7 @@ async function handleGDriveBackupClick() {
   }
   if (!googleAccessToken) {
     pendingGDriveAction = 'backup';
-    googleTokenClient.requestAccessToken({ prompt: 'consent' });
+    googleTokenClient.requestAccessToken({ prompt: 'select_account' });
   } else {
     await performGDriveBackup();
   }
@@ -8806,7 +8806,7 @@ async function handleGDriveRestoreClick(noConfirm = false) {
   if (noConfirm || confirm('This will overwrite current local data with the backup from Google Drive. Proceed?')) {
     if (!googleAccessToken) {
       pendingGDriveAction = 'restore';
-      googleTokenClient.requestAccessToken({ prompt: 'consent' });
+      googleTokenClient.requestAccessToken({ prompt: 'select_account' });
     } else {
       await performGDriveRestore();
     }
@@ -8820,7 +8820,7 @@ async function handleGDriveSyncClick() {
   }
   if (!googleAccessToken) {
     pendingGDriveAction = 'sync';
-    googleTokenClient.requestAccessToken({ prompt: 'consent' });
+    googleTokenClient.requestAccessToken({ prompt: 'select_account' });
   } else {
     await performGDriveSync(false);
   }
@@ -8881,11 +8881,11 @@ function initAccountHandlers() {
   if (btnConnect) {
     btnConnect.addEventListener('click', () => {
       if (googleTokenClient) {
-        googleTokenClient.requestAccessToken({ prompt: 'consent' });
+        googleTokenClient.requestAccessToken({ prompt: 'select_account' });
       } else {
         initGoogleDriveSync();
         if (googleTokenClient) {
-          googleTokenClient.requestAccessToken({ prompt: 'consent' });
+          googleTokenClient.requestAccessToken({ prompt: 'select_account' });
         } else {
           alert('Google Identity service is not ready. Check your connection or Content Security Policy.');
         }
