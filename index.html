@@ -118,15 +118,14 @@
       </nav>
 
       <div class="sidebar-footer" style="padding: 10px 0; border-top: 1px solid var(--color-border); width: 100%;">
-        <a class="nav-link" id="btn-settings-toggle" data-tab="settings" aria-label="Settings"
+        <a class="nav-link" id="btn-account-toggle" data-tab="account" aria-label="Account"
           style="width: 100%; display: flex; align-items: center; justify-content: center; text-decoration: none;">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings" width="16" height="16">
-            <path
-              d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-            <circle cx="12" cy="12" r="3" />
+            stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user" width="16" height="16">
+            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
           </svg>
-          Settings
+          Account
         </a>
       </div>
     </aside>
@@ -1486,179 +1485,239 @@
         </button>
       </section>
 
-      <!-- VIEW 7: Settings -->
-      <section class="page-view" id="view-settings">
-        <div class="settings-grid">
-          <!-- Card 1: Google Drive Sync -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <div class="settings-card-icon"
-                style="color: var(--color-primary); background-color: rgba(99, 102, 241, 0.08);">
+      <!-- VIEW 7: Account -->
+      <section class="page-view" id="view-account">
+        <div class="account-grid">
+
+          <!-- Card 1: Google Account & Cloud Sync -->
+          <div class="account-card">
+            <div class="account-card-header">
+              <div class="account-card-icon"
+                style="color: var(--color-primary); background-color: rgba(99, 102, 241, 0.1);">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24">
-                  <path
-                    d="M17.5 19A3.5 3.5 0 0 0 21 15.5c0-2.79-2.54-4.5-5-4.5-.48 0-.96.06-1.42.17A6 6 0 0 0 3.5 13A5.5 5.5 0 0 0 9 18.5h8.5Z" />
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+                  <path d="M17.5 19A3.5 3.5 0 0 0 21 15.5c0-2.79-2.54-4.5-5-4.5-.48 0-.96.06-1.42.17A6 6 0 0 0 3.5 13A5.5 5.5 0 0 0 9 18.5h8.5Z" />
                 </svg>
               </div>
               <div>
-                <h3 class="settings-card-title">Google Drive Sync</h3>
-                <p class="settings-card-subtitle">Connect your personal Google Account to automatically sync data across devices.</p>
+                <h3 class="account-card-title">Google Account</h3>
+                <p class="account-card-subtitle">Connect your Google Drive to sync your data automatically across devices.</p>
               </div>
             </div>
-            <div class="settings-card-body">
-              <div class="gdrive-info-box">
-                <p><strong>🔒 Privacy-First Design:</strong> Moyeniz uses a hidden <strong>App Data Folder</strong> on
-                  your personal Google Drive. This folder is completely private, isolated from other websites/apps, and
-                  cannot be accessed or read by third parties. Your financial data stays 100% yours.</p>
-              </div>
-              <div class="gdrive-status-container">
-                <div class="gdrive-status-left">
-                  <span class="status-label">Account:</span>
-                  <span id="page-gdrive-status" class="status-value">Not Connected</span>
-                </div>
-                <div id="page-gdrive-sync-indicator" style="font-size: 0.78rem; color: var(--color-text-muted);">
-                  Idle
-                </div>
-              </div>
 
-              <!-- Auto-Sync & Interval Settings -->
-              <div class="gdrive-sync-options">
-                <div class="gdrive-sync-row">
-                  <span class="gdrive-sync-label">Auto-Sync Interval:</span>
-                  <select id="select-gdrive-auto-sync" class="gdrive-sync-select" aria-label="Auto-Sync Interval">
-                    <option value="0">Disabled (Manual Only)</option>
-                    <option value="5">Every 5 minutes</option>
-                    <option value="15" selected>Every 15 minutes</option>
-                    <option value="30">Every 30 minutes</option>
-                    <option value="60">Every 1 hour</option>
-                  </select>
-                </div>
-                <div class="gdrive-sync-row">
-                  <span class="gdrive-sync-label">Last Synced:</span>
-                  <span id="page-gdrive-last-sync" style="font-size: 0.82rem; font-weight: 600; color: var(--color-text-primary);">Never</span>
+            <div class="account-card-body">
+              <!-- When Connected -->
+              <div id="account-connected-panel" style="display: none; flex-direction: column; gap: 16px;">
+                <div class="account-user-profile">
+                  <div class="account-profile-left">
+                    <div class="account-avatar-circle" id="account-avatar-char">G</div>
+                    <div>
+                      <div id="account-user-email" style="font-weight: 600; font-size: 0.88rem; color: var(--color-text-primary);">user@gmail.com</div>
+                      <div style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #10b981; margin-top: 2px;">
+                        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: #10b981;"></span>
+                        Connected &amp; Synced
+                      </div>
+                    </div>
+                  </div>
+                  <button type="button" class="btn btn-secondary" id="btn-account-disconnect" style="padding: 6px 12px; font-size: 0.78rem;">
+                    Disconnect
+                  </button>
                 </div>
 
-                <!-- Collapsible Custom Client ID Config -->
-                <button type="button" class="gdrive-client-id-toggle" id="btn-toggle-client-id" aria-expanded="false">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
-                    <circle cx="12" cy="12" r="3"></circle>
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                  </svg>
-                  Custom Google OAuth Client ID (Optional)
-                </button>
-                <div class="gdrive-client-id-panel" id="panel-client-id">
-                  <p style="font-size: 0.74rem; color: var(--color-text-secondary); line-height: 1.4; margin: 0;">
-                    Hosting on your own Vercel domain (e.g. <code>yourapp.vercel.app</code>)? Create a Google OAuth 2.0 Client ID in Google Cloud Console and paste it here:
-                  </p>
-                  <div class="gdrive-client-id-input-wrap">
-                    <input type="text" id="input-custom-client-id" class="gdrive-client-id-input" placeholder="e.g. 123456-abc.apps.googleusercontent.com" spellcheck="false" autocomplete="off" />
-                    <button type="button" class="btn btn-secondary" id="btn-save-custom-client-id" style="padding: 6px 12px; font-size: 0.78rem;">Save</button>
+                <div class="gdrive-sync-options">
+                  <div class="gdrive-sync-row">
+                    <span class="gdrive-sync-label">Auto-Sync Frequency:</span>
+                    <select id="select-account-auto-sync" class="gdrive-sync-select" aria-label="Auto-Sync Frequency">
+                      <option value="0">Manual Only (Off)</option>
+                      <option value="5">Every 5 minutes</option>
+                      <option value="15" selected>Every 15 minutes (Default)</option>
+                      <option value="30">Every 30 minutes</option>
+                      <option value="60">Every 1 hour</option>
+                    </select>
+                  </div>
+                  <div class="gdrive-sync-row">
+                    <span class="gdrive-sync-label">Last Synced:</span>
+                    <span id="account-last-synced-time" style="font-size: 0.82rem; font-weight: 600; color: var(--color-text-primary);">Never</span>
+                  </div>
+                </div>
+
+                <div class="settings-actions">
+                  <button class="btn btn-primary" id="btn-account-sync-now">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"
+                      id="icon-account-sync" style="margin-right: 6px;">
+                      <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                    </svg>
+                    Sync Now
+                  </button>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <button class="btn btn-secondary" id="btn-account-backup">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"
+                        style="margin-right: 5px;">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                      </svg>
+                      Backup to Drive
+                    </button>
+                    <button class="btn btn-secondary" id="btn-account-restore">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"
+                        style="margin-right: 5px;">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                      Restore from Drive
+                    </button>
                   </div>
                 </div>
               </div>
 
-              <div class="settings-actions">
-                <button class="btn btn-secondary" id="btn-page-gdrive-connect">
-                  Connect Google Account
-                </button>
-                <button class="btn btn-secondary" id="btn-page-gdrive-sync-now" style="display: none;">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"
-                    id="icon-sync-now" style="margin-right: 6px;">
-                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+              <!-- When Disconnected -->
+              <div id="account-disconnected-panel" style="display: flex; flex-direction: column; gap: 16px;">
+                <div class="gdrive-info-box">
+                  <p>🔒 <strong>Zero-Knowledge Privacy:</strong> Moyeniz syncs directly to a private, hidden <strong>AppData Folder</strong> in your own personal Google Drive. No central server or third party ever has access to your portfolio.</p>
+                </div>
+
+                <button type="button" class="btn-google" id="btn-account-connect">
+                  <svg viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
                   </svg>
-                  Sync Now
+                  Connect with Google
                 </button>
-                <button class="btn btn-secondary" id="btn-page-gdrive-backup">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"
-                    style="margin-right: 6px;">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="17 8 12 3 7 8" />
-                    <line x1="12" y1="3" x2="12" y2="15" />
-                  </svg>
-                  Backup to Drive
-                </button>
-                <button class="btn btn-secondary" id="btn-page-gdrive-restore">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"
-                    style="margin-right: 6px;">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                  Restore from Drive
-                </button>
+
+                <!-- Status Feedback -->
+                <div id="account-auth-status" style="font-size: 0.8rem; text-align: center; color: var(--color-text-secondary); display: none;"></div>
+
+                <!-- Collapsible Advanced OAuth Config -->
+                <div style="margin-top: 4px; border-top: 1px dashed var(--color-border); padding-top: 10px;">
+                  <button type="button" class="gdrive-client-id-toggle" id="btn-toggle-oauth-config" aria-expanded="false">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                      <circle cx="12" cy="12" r="3"></circle>
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    Google Cloud OAuth Client ID (Troubleshooting / Custom Domains)
+                  </button>
+
+                  <div class="gdrive-client-id-panel" id="panel-oauth-config">
+                    <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.76rem; color: var(--color-text-secondary); line-height: 1.4;">
+                      <p style="margin: 0;"><strong>Step 1:</strong> In Google Cloud Console &rarr; <em>Credentials</em> &rarr; <em>OAuth 2.0 Client IDs</em>, ensure this exact origin is listed under <strong>Authorized JavaScript origins</strong>:</p>
+                      <div class="origin-copy-box">
+                        <span id="account-current-origin">http://localhost:3000</span>
+                        <button type="button" id="btn-copy-origin" class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.72rem; height: auto;">Copy Origin</button>
+                      </div>
+                      <p style="margin: 4px 0 0 0;"><strong>Step 2:</strong> Under <em>OAuth consent screen</em>, add your Gmail under <strong>Test users</strong> (if your app is in Testing mode).</p>
+                      <p style="margin: 4px 0 0 0;"><strong>Step 3:</strong> Enter your custom Client ID below:</p>
+                      <div class="gdrive-client-id-input-wrap">
+                        <input type="text" id="input-account-client-id" class="gdrive-client-id-input" placeholder="e.g. 123456-abc.apps.googleusercontent.com" spellcheck="false" autocomplete="off" />
+                        <button type="button" class="btn btn-secondary" id="btn-save-account-client-id" style="padding: 6px 12px; font-size: 0.78rem;">Save</button>
+                        <button type="button" class="btn btn-secondary" id="btn-reset-account-client-id" style="padding: 6px 10px; font-size: 0.78rem;" title="Reset to default">Reset</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Card 2: Local Backups & Data Management -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <div class="settings-card-icon"
-                style="color: var(--color-warning); background-color: rgba(245, 158, 11, 0.08);">
+          <!-- Card 2: Local Data & Backups -->
+          <div class="account-card">
+            <div class="account-card-header">
+              <div class="account-card-icon"
+                style="color: var(--color-warning); background-color: rgba(245, 158, 11, 0.1);">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24">
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
                   <ellipse cx="12" cy="5" rx="9" ry="3" />
                   <path d="M3 5V19A9 3 0 0 0 21 19V5" />
                   <path d="M3 12A9 3 0 0 0 21 12" />
                 </svg>
               </div>
               <div>
-                <h3 class="settings-card-title">Local Data &amp; Cache</h3>
-                <p class="settings-card-subtitle">Manage your local storage, import backups, or reset the app.</p>
+                <h3 class="account-card-title">Local Data &amp; Backups</h3>
+                <p class="account-card-subtitle">Manage browser storage, export manual JSON backups, or wipe data.</p>
               </div>
             </div>
-            <div class="settings-card-body">
-              <div class="gdrive-info-box" style="border-left-color: var(--color-warning);">
-                <p>💡 <strong>Note on Local Backups:</strong> Save local data to your device manually. Your data is 100%
-                  yours. All the temporary modifications will be lost if you clear the browser cache, browser cookies,
-                  or use the app in incognito mode.</p>
-              </div>
-              <div class="settings-actions">
-                <button class="btn btn-secondary" id="btn-page-download-json">
+
+            <div class="account-card-body">
+              <!-- Export Row -->
+              <div class="data-action-row">
+                <div class="data-action-info">
+                  <h4>Export JSON Backup</h4>
+                  <p>Download your complete portfolio and logs as an offline <code>moyeniz.json</code> file.</p>
+                </div>
+                <button class="btn btn-secondary" id="btn-account-download-json" style="flex-shrink: 0;">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"
-                    style="margin-right: 6px;">
+                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"
+                    style="margin-right: 5px;">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="7 10 12 15 17 10" />
                     <line x1="12" y1="15" x2="12" y2="3" />
                   </svg>
-                  Download Backup (.json)
+                  Export
                 </button>
-                <label for="page-settings-file-input" class="btn btn-secondary"
-                  style="cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; margin: 0; padding: 8px 16px;">
-                  <input type="file" id="page-settings-file-input" accept=".json" style="display: none;">
+              </div>
+
+              <!-- Import Row -->
+              <div class="data-action-row">
+                <div class="data-action-info">
+                  <h4>Import JSON Backup</h4>
+                  <p>Restore investments, liabilities, and budgets from a previously exported backup file.</p>
+                </div>
+                <label for="account-file-input" class="btn btn-secondary"
+                  style="flex-shrink: 0; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 5px; margin: 0; padding: 8px 14px;">
+                  <input type="file" id="account-file-input" accept=".json" style="display: none;">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="17 8 12 3 7 8" />
                     <line x1="12" y1="3" x2="12" y2="15" />
                   </svg>
-                  Upload Backup (.json)
+                  Import
                 </label>
-                <button class="btn btn-secondary" id="btn-page-reset-data">
+              </div>
+
+              <!-- Reset to Sample Demo Data -->
+              <div class="data-action-row">
+                <div class="data-action-info">
+                  <h4>Load Demo Portfolio</h4>
+                  <p>Load the pre-populated sample assets (stocks, mutual funds, gold) for exploration.</p>
+                </div>
+                <button class="btn btn-secondary" id="btn-account-reset-sample" style="flex-shrink: 0;">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"
-                    style="margin-right: 6px;">
+                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"
+                    style="margin-right: 5px;">
                     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
                     <path d="M3 3v5h5" />
                   </svg>
-                  Reset Sample Data
+                  Load Demo
                 </button>
-                <button class="btn btn-danger-outline" id="btn-page-clear-cache">
+              </div>
+
+              <!-- Danger Erase All Data Row -->
+              <div class="data-action-row" style="border-color: rgba(239, 68, 68, 0.25); background-color: rgba(239, 68, 68, 0.04);">
+                <div class="data-action-info">
+                  <h4 style="color: var(--color-negative);">Erase All Data</h4>
+                  <p>Wipe all investments, debts, and cashflows from this device. Leaves a completely clean slate.</p>
+                </div>
+                <button class="btn btn-danger-outline" id="btn-account-clear-data" style="flex-shrink: 0;">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"
-                    style="margin-right: 6px;">
+                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"
+                    style="margin-right: 5px;">
                     <polyline points="3 6 5 6 21 6" />
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                   </svg>
-                  Clear Cached Data
+                  Erase Data
                 </button>
               </div>
+
             </div>
           </div>
+
         </div>
       </section>
 

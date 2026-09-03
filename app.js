@@ -1093,9 +1093,9 @@ function initNavigation() {
       } else if (tabName === 'expenses') {
         viewTitle.textContent = 'Expense Tracker';
         renderExpenses();
-      } else if (tabName === 'settings') {
-        viewTitle.textContent = 'Settings';
-        renderSettings();
+      } else if (tabName === 'account' || tabName === 'settings') {
+        viewTitle.textContent = 'Account';
+        renderAccount();
       }
 
       updateTopActions(tabName);
@@ -8315,7 +8315,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initDashboardSectionToggles();
   initFilterHandlers();
   initModalHandlers();
-  initSettingsHandlers();
+  initAccountHandlers();
   initCalculatorSliders();
   initGoogleDriveSync();
 
@@ -8333,7 +8333,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   else if (activeTabName === 'borrow-lent') renderBorrowLent();
   else if (activeTabName === 'salary') renderSalaries();
   else if (activeTabName === 'expenses') renderExpenses();
-  else if (activeTabName === 'settings') renderSettings();
+  else if (activeTabName === 'account' || activeTabName === 'settings') renderAccount();
 
   updateTopActions(activeTabName);
 });
@@ -8368,38 +8368,24 @@ function formatRelativeTime(timestamp) {
 
 // Update Last Synced element
 function updateLastSyncedDisplay() {
-  const lastSyncEl = document.getElementById('page-gdrive-last-sync');
+  const lastSyncEl = document.getElementById('account-last-synced-time');
   if (lastSyncEl) {
     lastSyncEl.textContent = formatRelativeTime(lastSyncedTimestamp);
   }
 }
 
-// Update UI status safely
-function updateGDriveStatus(message, isError = false) {
-  const statusEl = document.getElementById('page-gdrive-status');
-  if (statusEl) {
-    statusEl.textContent = message;
-    if (isError) {
-      statusEl.style.color = 'var(--color-negative)';
-    } else {
-      statusEl.style.color = 'var(--color-text-primary)';
-    }
-  }
-}
-
 // Update Top / Status indicator
 function updateSyncIndicator(text, isError = false, isSpinning = false) {
-  const indEl = document.getElementById('page-gdrive-sync-indicator');
-  const syncIcon = document.getElementById('icon-sync-now');
+  const syncIcon = document.getElementById('icon-account-sync');
+  const authStatus = document.getElementById('account-auth-status');
 
-  if (indEl) {
-    indEl.textContent = text;
-    if (isError) {
-      indEl.style.color = 'var(--color-negative)';
-    } else if (isSpinning) {
-      indEl.style.color = 'var(--color-primary)';
+  if (authStatus) {
+    if (text && text !== 'Idle') {
+      authStatus.style.display = 'block';
+      authStatus.textContent = text;
+      authStatus.style.color = isError ? 'var(--color-negative)' : (isSpinning ? 'var(--color-primary)' : 'var(--color-text-secondary)');
     } else {
-      indEl.style.color = 'var(--color-text-muted)';
+      authStatus.style.display = 'none';
     }
   }
 
@@ -8412,23 +8398,43 @@ function updateSyncIndicator(text, isError = false, isSpinning = false) {
   }
 }
 
-// Update standard connected state
-function updateSyncStatusUI() {
-  const btnConnect = document.getElementById('btn-page-gdrive-connect');
-  const btnSyncNow = document.getElementById('btn-page-gdrive-sync-now');
+// Render Account Page
+function renderAccount() {
+  const connectedPanel = document.getElementById('account-connected-panel');
+  const disconnectedPanel = document.getElementById('account-disconnected-panel');
+  const userEmailEl = document.getElementById('account-user-email');
+  const avatarCharEl = document.getElementById('account-avatar-char');
+  const selectAutoSync = document.getElementById('select-account-auto-sync');
+  const inputClientId = document.getElementById('input-account-client-id');
+  const originDisplay = document.getElementById('account-current-origin');
+
   const isConnected = (googleAccessToken || localStorage.getItem('moyeniz_gdrive_connected') === 'true') && googleUserEmail;
 
+  if (originDisplay) {
+    originDisplay.textContent = window.location.origin;
+  }
+
+  if (inputClientId) {
+    inputClientId.value = localStorage.getItem('moyeniz_custom_client_id') || '';
+  }
+
   if (isConnected) {
-    updateGDriveStatus(`Connected (${maskEmail(googleUserEmail)})`);
-    if (btnConnect) btnConnect.textContent = 'Disconnect Google Account';
-    if (btnSyncNow) btnSyncNow.style.display = 'inline-flex';
+    if (connectedPanel) connectedPanel.style.display = 'flex';
+    if (disconnectedPanel) disconnectedPanel.style.display = 'none';
+    if (userEmailEl) userEmailEl.textContent = googleUserEmail;
+    if (avatarCharEl) avatarCharEl.textContent = googleUserEmail.charAt(0).toUpperCase() || 'G';
+    if (selectAutoSync) selectAutoSync.value = autoSyncMinutes.toString();
   } else {
-    updateGDriveStatus('Not Connected');
-    if (btnConnect) btnConnect.textContent = 'Connect Google Account';
-    if (btnSyncNow) btnSyncNow.style.display = 'none';
+    if (connectedPanel) connectedPanel.style.display = 'none';
+    if (disconnectedPanel) disconnectedPanel.style.display = 'flex';
   }
 
   updateLastSyncedDisplay();
+}
+
+// Backward compatibility alias
+function renderSettings() {
+  renderAccount();
 }
 
 // Start periodic background auto-sync timer
@@ -8443,7 +8449,6 @@ function startAutoSyncTimer() {
     autoSyncIntervalId = setInterval(async () => {
       if (!isSyncingToGDrive && localStorage.getItem('moyeniz_gdrive_connected') === 'true') {
         if (!googleAccessToken || Date.now() > googleTokenExpiresAt - 60000) {
-          // Token expired or missing, request silently
           if (googleTokenClient) {
             pendingGDriveAction = 'sync';
             try {
@@ -8472,7 +8477,7 @@ function scheduleDebouncedAutoSync() {
   }
 }
 
-// Initializer for Google Identity Services client
+// Initializer for Google Identity Services client with detailed error handling
 function initGoogleDriveSync() {
   const clientId = getGoogleClientId();
 
@@ -8483,10 +8488,20 @@ function initGoogleDriveSync() {
         scope: 'email https://www.googleapis.com/auth/drive.appdata',
         callback: async (tokenResponse) => {
           if (tokenResponse.error !== undefined) {
-            console.error('OAuth token client error:', tokenResponse.error);
-            updateGDriveStatus('Error: Auth failed', true);
+            console.error('OAuth token client error:', tokenResponse);
+            let userMsg = tokenResponse.error_description || tokenResponse.error || 'Authentication failed';
+            
+            if (tokenResponse.error === 'popup_closed_by_user') {
+              userMsg = 'Sign-in popup was closed before completing.';
+            } else if (tokenResponse.error === 'access_denied') {
+              userMsg = 'Access Denied: If your Google Cloud project is in Testing mode, ensure your Gmail account is added under "Test users" in Google Cloud Console.';
+            } else if (tokenResponse.error === 'origin_mismatch' || tokenResponse.error === 'idpiframe_initialization_failed') {
+              userMsg = `Origin mismatch: Add "${window.location.origin}" to Authorized JavaScript origins in Google Cloud Console.`;
+            }
+
+            updateSyncIndicator(userMsg, true, false);
+            alert(`Google Sign-In Error:\n${userMsg}`);
             isSyncingToGDrive = false;
-            updateSyncIndicator('Auth failed', true);
             return;
           }
 
@@ -8496,6 +8511,7 @@ function initGoogleDriveSync() {
 
           await fetchGoogleUserEmail();
           startAutoSyncTimer();
+          renderAccount();
 
           if (pendingGDriveAction) {
             const action = pendingGDriveAction;
@@ -8508,6 +8524,17 @@ function initGoogleDriveSync() {
               await performGDriveSync();
             }
           }
+        },
+        error_callback: (err) => {
+          console.error('Google Identity Service error_callback:', err);
+          let msg = 'Google Sign-In failed.';
+          if (err && err.type === 'popup_failed_to_open') {
+            msg = 'Popup blocked by browser. Please allow popups for this site.';
+          } else if (err && err.type === 'popup_closed') {
+            msg = 'Popup closed.';
+          }
+          updateSyncIndicator(msg, true, false);
+          alert(msg);
         }
       });
 
@@ -8523,10 +8550,10 @@ function initGoogleDriveSync() {
         }
       }
 
-      updateSyncStatusUI();
+      renderAccount();
     } catch (err) {
       console.error('Failed to initialize Google token client:', err);
-      updateGDriveStatus('Init Error', true);
+      updateSyncIndicator('Google API Init Error', true, false);
     }
   } else {
     // Retry if script is still downloading
@@ -8534,13 +8561,13 @@ function initGoogleDriveSync() {
       if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
         initGoogleDriveSync();
       } else {
-        updateGDriveStatus('Google API Blocked');
+        updateSyncIndicator('Google Identity script not loaded', true, false);
       }
     }, 800);
   }
 }
 
-// Fetch Google User Email to display in settings status
+// Fetch Google User Email to display in account status
 async function fetchGoogleUserEmail() {
   try {
     const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
@@ -8550,7 +8577,7 @@ async function fetchGoogleUserEmail() {
       const data = await response.json();
       googleUserEmail = data.email || '';
       localStorage.setItem('moyeniz_gdrive_email', googleUserEmail);
-      updateSyncStatusUI();
+      renderAccount();
     }
   } catch (err) {
     console.error('Error fetching user email:', err);
@@ -8561,8 +8588,7 @@ async function fetchGoogleUserEmail() {
 async function performGDriveSync(isBackground = false) {
   if (isSyncingToGDrive) return;
   isSyncingToGDrive = true;
-  updateSyncIndicator('Syncing...', false, true);
-  if (!isBackground) updateGDriveStatus('Sync: In Progress...');
+  updateSyncIndicator('Syncing with Google Drive...', false, true);
 
   try {
     await performGDriveBackup(true);
@@ -8570,28 +8596,27 @@ async function performGDriveSync(isBackground = false) {
     lastSyncedTimestamp = Date.now();
     localStorage.setItem('moyeniz_last_synced_at', lastSyncedTimestamp.toString());
     updateLastSyncedDisplay();
-    updateSyncIndicator('Up to date', false);
+    updateSyncIndicator('Up to date', false, false);
 
     if (!isBackground) {
-      updateGDriveStatus('Sync Successful!');
-      setTimeout(() => updateSyncStatusUI(), 3000);
+      alert('Portfolio successfully synced with Google Drive!');
+      renderAccount();
     }
   } catch (err) {
     console.error('Sync failed:', err);
-    updateSyncIndicator('Sync failed', true);
+    updateSyncIndicator('Sync failed', true, false);
     if (!isBackground) {
-      updateGDriveStatus('Sync Failed', true);
-      setTimeout(() => updateSyncStatusUI(), 3000);
+      alert('Sync failed. Check your internet connection or Google Drive permissions.');
     }
   } finally {
     isSyncingToGDrive = false;
-    updateSyncIndicator('Idle', false, false);
+    updateSyncIndicator('', false, false);
   }
 }
 
 // Perform Google Drive Backup (Upload)
 async function performGDriveBackup(silent = false) {
-  if (!silent) updateGDriveStatus('Sync: Backing up...');
+  if (!silent) updateSyncIndicator('Backing up to Drive...', false, true);
   try {
     // 1. Search for existing file in appDataFolder
     const searchUrl = 'https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name=%27moyeniz_backup.json%27';
@@ -8601,7 +8626,7 @@ async function performGDriveBackup(silent = false) {
 
     if (searchResponse.status === 401) {
       pendingGDriveAction = 'backup';
-      if (googleTokenClient) googleTokenClient.requestAccessToken();
+      if (googleTokenClient) googleTokenClient.requestAccessToken({ prompt: 'consent' });
       return;
     }
 
@@ -8668,22 +8693,23 @@ async function performGDriveBackup(silent = false) {
     updateLastSyncedDisplay();
 
     if (!silent) {
-      updateGDriveStatus('Backup Successful!');
-      setTimeout(() => updateSyncStatusUI(), 3000);
+      alert('Backup to Google Drive succeeded!');
+      renderAccount();
     }
   } catch (err) {
     console.error('Backup error:', err);
     if (!silent) {
-      updateGDriveStatus('Backup Failed', true);
-      setTimeout(() => updateSyncStatusUI(), 3000);
+      alert(`Backup failed: ${err.message || 'Unknown error'}`);
     }
     throw err;
+  } finally {
+    if (!silent) updateSyncIndicator('', false, false);
   }
 }
 
 // Perform Google Drive Restore (Download)
 async function performGDriveRestore() {
-  updateGDriveStatus('Sync: Restoring...');
+  updateSyncIndicator('Restoring from Google Drive...', false, true);
   try {
     // 1. Search for file in appDataFolder
     const searchUrl = 'https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name=%27moyeniz_backup.json%27';
@@ -8693,7 +8719,7 @@ async function performGDriveRestore() {
 
     if (searchResponse.status === 401) {
       pendingGDriveAction = 'restore';
-      if (googleTokenClient) googleTokenClient.requestAccessToken();
+      if (googleTokenClient) googleTokenClient.requestAccessToken({ prompt: 'consent' });
       return;
     }
 
@@ -8705,8 +8731,8 @@ async function performGDriveRestore() {
     const fileId = searchData.files && searchData.files.length > 0 ? searchData.files[0].id : null;
 
     if (!fileId) {
-      updateGDriveStatus('No backup found on Drive!', true);
-      setTimeout(() => updateSyncStatusUI(), 4000);
+      alert('No backup file found in your Google Drive AppData folder.');
+      updateSyncIndicator('', false, false);
       return;
     }
 
@@ -8748,41 +8774,25 @@ async function performGDriveRestore() {
     else if (activeTabName === 'borrow-lent') renderBorrowLent();
     else if (activeTabName === 'salary') renderSalaries();
     else if (activeTabName === 'expenses') renderExpenses();
+    else if (activeTabName === 'account') renderAccount();
 
-    updateGDriveStatus('Restore Successful!');
-    setTimeout(() => updateSyncStatusUI(), 3000);
+    alert('Portfolio restored successfully from Google Drive!');
   } catch (err) {
     console.error('Restore error:', err);
-    updateGDriveStatus('Restore Failed', true);
-    setTimeout(() => updateSyncStatusUI(), 3000);
-  }
-}
-
-// Settings Page Render
-function renderSettings() {
-  updateSyncStatusUI();
-
-  // Populate Auto-sync selector
-  const selectAutoSync = document.getElementById('select-gdrive-auto-sync');
-  if (selectAutoSync) {
-    selectAutoSync.value = autoSyncMinutes.toString();
-  }
-
-  // Populate custom client id
-  const inputClientId = document.getElementById('input-custom-client-id');
-  if (inputClientId) {
-    inputClientId.value = localStorage.getItem('moyeniz_custom_client_id') || '';
+    alert(`Restore failed: ${err.message || 'Invalid or corrupted file'}`);
+  } finally {
+    updateSyncIndicator('', false, false);
   }
 }
 
 async function handleGDriveBackupClick() {
   if (!googleTokenClient) {
-    alert('Google Drive API is blocked or not loaded. Check your connection or Content Security Policy.');
+    alert('Google Identity script is not loaded yet. Check your internet connection.');
     return;
   }
   if (!googleAccessToken) {
     pendingGDriveAction = 'backup';
-    googleTokenClient.requestAccessToken();
+    googleTokenClient.requestAccessToken({ prompt: 'consent' });
   } else {
     await performGDriveBackup();
   }
@@ -8790,51 +8800,34 @@ async function handleGDriveBackupClick() {
 
 async function handleGDriveRestoreClick(noConfirm = false) {
   if (!googleTokenClient) {
-    alert('Google Drive API is blocked or not loaded. Check your connection or Content Security Policy.');
+    alert('Google Identity script is not loaded yet. Check your internet connection.');
     return;
   }
-  if (noConfirm) {
+  if (noConfirm || confirm('This will overwrite current local data with the backup from Google Drive. Proceed?')) {
     if (!googleAccessToken) {
       pendingGDriveAction = 'restore';
-      googleTokenClient.requestAccessToken();
+      googleTokenClient.requestAccessToken({ prompt: 'consent' });
     } else {
       await performGDriveRestore();
-    }
-  } else {
-    if (gdriveRestoreConfirmTimeout) {
-      clearTimeout(gdriveRestoreConfirmTimeout);
-      gdriveRestoreConfirmTimeout = null;
-      if (!googleAccessToken) {
-        pendingGDriveAction = 'restore';
-        googleTokenClient.requestAccessToken();
-      } else {
-        await performGDriveRestore();
-      }
-    } else {
-      updateGDriveStatus('Click RESTORE again to confirm!');
-      gdriveRestoreConfirmTimeout = setTimeout(() => {
-        gdriveRestoreConfirmTimeout = null;
-        updateSyncStatusUI();
-      }, 4000);
     }
   }
 }
 
 async function handleGDriveSyncClick() {
   if (!googleTokenClient) {
-    alert('Google Drive API is blocked or not loaded. Check your connection or Content Security Policy.');
+    alert('Google Identity script is not loaded yet. Check your internet connection.');
     return;
   }
   if (!googleAccessToken) {
     pendingGDriveAction = 'sync';
-    googleTokenClient.requestAccessToken();
+    googleTokenClient.requestAccessToken({ prompt: 'consent' });
   } else {
     await performGDriveSync(false);
   }
 }
 
-// Initialize settings page and sync dropdown handlers
-function initSettingsHandlers() {
+// Initialize Account page handlers
+function initAccountHandlers() {
   // Sync portfolio popup modal toggle
   const btnSyncPortfolio = document.getElementById('btn-sync-portfolio');
   const syncModal = document.getElementById('sync-portfolio-modal');
@@ -8883,16 +8876,28 @@ function initSettingsHandlers() {
     });
   }
 
-  // Dedicated settings page buttons
-  const btnConnect = document.getElementById('btn-page-gdrive-connect');
-  const btnSyncNow = document.getElementById('btn-page-gdrive-sync-now');
-  const btnBackup = document.getElementById('btn-page-gdrive-backup');
-  const btnRestore = document.getElementById('btn-page-gdrive-restore');
-
+  // Account Page: Google Connect Button
+  const btnConnect = document.getElementById('btn-account-connect');
   if (btnConnect) {
     btnConnect.addEventListener('click', () => {
-      if (googleAccessToken || localStorage.getItem('moyeniz_gdrive_connected') === 'true') {
-        // Disconnect
+      if (googleTokenClient) {
+        googleTokenClient.requestAccessToken({ prompt: 'consent' });
+      } else {
+        initGoogleDriveSync();
+        if (googleTokenClient) {
+          googleTokenClient.requestAccessToken({ prompt: 'consent' });
+        } else {
+          alert('Google Identity service is not ready. Check your connection or Content Security Policy.');
+        }
+      }
+    });
+  }
+
+  // Account Page: Google Disconnect Button
+  const btnDisconnect = document.getElementById('btn-account-disconnect');
+  if (btnDisconnect) {
+    btnDisconnect.addEventListener('click', () => {
+      if (confirm('Disconnect your Google account from this device? (Local data will NOT be deleted).')) {
         googleAccessToken = null;
         googleUserEmail = '';
         localStorage.removeItem('moyeniz_gdrive_connected');
@@ -8901,35 +8906,28 @@ function initSettingsHandlers() {
           clearInterval(autoSyncIntervalId);
           autoSyncIntervalId = null;
         }
-        updateSyncStatusUI();
-      } else {
-        // Connect
-        if (googleTokenClient) {
-          googleTokenClient.requestAccessToken({ prompt: 'select_account' });
-        } else {
-          initGoogleDriveSync();
-          if (googleTokenClient) {
-            googleTokenClient.requestAccessToken({ prompt: 'select_account' });
-          } else {
-            alert('Google Drive API is blocked or not loaded. Check your connection or Content Security Policy.');
-          }
-        }
+        renderAccount();
       }
     });
   }
 
+  // Account Page: Sync Now
+  const btnSyncNow = document.getElementById('btn-account-sync-now');
   if (btnSyncNow) {
     btnSyncNow.addEventListener('click', async () => {
       await handleGDriveSyncClick();
     });
   }
 
+  // Account Page: Backup & Restore
+  const btnBackup = document.getElementById('btn-account-backup');
   if (btnBackup) {
     btnBackup.addEventListener('click', async () => {
       await handleGDriveBackupClick();
     });
   }
 
+  const btnRestore = document.getElementById('btn-account-restore');
   if (btnRestore) {
     btnRestore.addEventListener('click', async () => {
       await handleGDriveRestoreClick();
@@ -8937,7 +8935,7 @@ function initSettingsHandlers() {
   }
 
   // Auto-sync interval selector
-  const selectAutoSync = document.getElementById('select-gdrive-auto-sync');
+  const selectAutoSync = document.getElementById('select-account-auto-sync');
   if (selectAutoSync) {
     selectAutoSync.addEventListener('change', (e) => {
       autoSyncMinutes = parseInt(e.target.value, 10);
@@ -8946,18 +8944,36 @@ function initSettingsHandlers() {
     });
   }
 
-  // Custom Client ID toggle & save
-  const btnToggleClientId = document.getElementById('btn-toggle-client-id');
-  const panelClientId = document.getElementById('panel-client-id');
-  if (btnToggleClientId && panelClientId) {
-    btnToggleClientId.addEventListener('click', () => {
-      const isExpanded = panelClientId.classList.toggle('active');
-      btnToggleClientId.setAttribute('aria-expanded', isExpanded.toString());
+  // OAuth Config accordion toggle
+  const btnToggleOAuthConfig = document.getElementById('btn-toggle-oauth-config');
+  const panelOAuthConfig = document.getElementById('panel-oauth-config');
+  if (btnToggleOAuthConfig && panelOAuthConfig) {
+    btnToggleOAuthConfig.addEventListener('click', () => {
+      const isExpanded = panelOAuthConfig.classList.toggle('active');
+      btnToggleOAuthConfig.setAttribute('aria-expanded', isExpanded.toString());
     });
   }
 
-  const btnSaveClientId = document.getElementById('btn-save-custom-client-id');
-  const inputClientId = document.getElementById('input-custom-client-id');
+  // Copy Origin Button
+  const btnCopyOrigin = document.getElementById('btn-copy-origin');
+  if (btnCopyOrigin) {
+    btnCopyOrigin.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(window.location.origin);
+        const prevText = btnCopyOrigin.textContent;
+        btnCopyOrigin.textContent = 'Copied!';
+        setTimeout(() => { btnCopyOrigin.textContent = prevText; }, 2000);
+      } catch (e) {
+        prompt('Copy this origin to clipboard:', window.location.origin);
+      }
+    });
+  }
+
+  // Custom Client ID save & reset
+  const btnSaveClientId = document.getElementById('btn-save-account-client-id');
+  const btnResetClientId = document.getElementById('btn-reset-account-client-id');
+  const inputClientId = document.getElementById('input-account-client-id');
+
   if (btnSaveClientId && inputClientId) {
     btnSaveClientId.addEventListener('click', () => {
       const val = inputClientId.value.trim();
@@ -8966,33 +8982,45 @@ function initSettingsHandlers() {
         alert('Custom Google OAuth Client ID saved! Reinitializing connection...');
       } else {
         localStorage.removeItem('moyeniz_custom_client_id');
-        alert('Custom Google Client ID cleared. Reverting to default.');
+        alert('Cleared custom Client ID. Reverting to default.');
       }
       initGoogleDriveSync();
     });
   }
 
-  const btnDownloadJson = document.getElementById('btn-page-download-json');
+  if (btnResetClientId && inputClientId) {
+    btnResetClientId.addEventListener('click', () => {
+      localStorage.removeItem('moyeniz_custom_client_id');
+      inputClientId.value = '';
+      alert('Reset to default Google OAuth Client ID.');
+      initGoogleDriveSync();
+    });
+  }
+
+  // Local Data: Download JSON Backup
+  const btnDownloadJson = document.getElementById('btn-account-download-json');
   if (btnDownloadJson) {
     btnDownloadJson.addEventListener('click', () => {
       downloadPortfolioJSON();
     });
   }
 
-  const settingsFileInput = document.getElementById('page-settings-file-input');
-  if (settingsFileInput) {
-    settingsFileInput.addEventListener('change', (e) => {
+  // Local Data: Import JSON
+  const fileInput = document.getElementById('account-file-input');
+  if (fileInput) {
+    fileInput.addEventListener('change', (e) => {
       if (e.target.files.length > 0) {
         handleUploadJSON(e.target.files[0]);
       }
     });
   }
 
-  const btnResetData = document.getElementById('btn-page-reset-data');
-  if (btnResetData) {
-    btnResetData.addEventListener('click', (e) => {
+  // Local Data: Reset Demo Sample Data
+  const btnResetSample = document.getElementById('btn-account-reset-sample');
+  if (btnResetSample) {
+    btnResetSample.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (confirm('This will restore the beautiful pre-populated sample portfolio. All custom edits will be lost. Proceed?')) {
+      if (confirm('Load demo portfolio? This will replace current investments, debts, and budgets with sample demonstration items.')) {
         investments = [...SAMPLE_PORTFOLIO];
         liabilities = [...SAMPLE_LIABILITIES];
         borrowLent = [...SAMPLE_BORROW_LENT];
@@ -9002,39 +9030,33 @@ function initSettingsHandlers() {
         globalBudget = 40000;
         monthlyBudgets = {};
         saveToStorage();
-        renderSettings();
-
-        const activeTab = document.querySelector('.nav-link.active').getAttribute('data-tab');
-        if (activeTab === 'dashboard') renderDashboard();
+        renderAccount();
+        alert('Demo sample portfolio loaded successfully!');
       }
     });
   }
 
-  const btnClearCache = document.getElementById('btn-page-clear-cache');
-  if (btnClearCache) {
-    btnClearCache.addEventListener('click', (e) => {
+  // Local Data: Clean Erase All Data
+  const btnClearData = document.getElementById('btn-account-clear-data');
+  if (btnClearData) {
+    btnClearData.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (confirm('DANGER: This will permanently delete your cached portfolio (investments, liabilities, and cashflows) from this browser\'s local storage. This action cannot be undone unless you have downloaded a backup. Proceed?')) {
-        localStorage.removeItem('moyeniz_investments');
-        localStorage.removeItem('moyeniz_liabilities');
-        localStorage.removeItem('moyeniz_borrow_lent');
-        localStorage.removeItem('moyeniz_salaries');
-        localStorage.removeItem('moyeniz_expenses');
-        localStorage.removeItem('moyeniz_expense_categories');
-        localStorage.removeItem('moyeniz_global_budget');
-        localStorage.removeItem('moyeniz_monthly_budgets');
-        localStorage.removeItem('moyeniz_last_synced_at');
+      if (confirm('DANGER: Permanently erase ALL portfolio data (investments, liabilities, cashflows, budgets) from this browser?\n\nThis leaves a 100% clean, blank slate. Proceed?')) {
         investments = [];
         liabilities = [];
         borrowLent = [];
         salaries = [];
         expenses = [];
-        expenseCategories = [];
+        expenseCategories = [...DEFAULT_EXPENSE_CATEGORIES];
         globalBudget = 40000;
         monthlyBudgets = {};
         lastSyncedTimestamp = 0;
 
-        renderSettings();
+        // Save empty state cleanly to local storage
+        saveToStorage();
+        localStorage.removeItem('moyeniz_last_synced_at');
+
+        renderAccount();
 
         // Redirect to dashboard
         const links = document.querySelectorAll('.nav-link');
@@ -9051,8 +9073,13 @@ function initSettingsHandlers() {
 
         if (viewTitle) viewTitle.textContent = 'Dashboard';
         renderDashboard();
-        alert('Cached browser data cleared successfully.');
+        alert('All local portfolio data has been completely erased. Clean blank slate ready!');
       }
     });
   }
+}
+
+// Backward compatibility alias
+function initSettingsHandlers() {
+  initAccountHandlers();
 }
